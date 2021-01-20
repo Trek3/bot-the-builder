@@ -17,9 +17,6 @@ NAMING, DESCRIPTION, DATE, CANCEL, SELECT, CLOSE = range(6)
 def start(update, context):
     chat_id = update.message.chat.id
 
-    if 'queue' not in context.bot_data:
-        context.bot_data['queue'] = RequestQueue()
-
     context.bot.sendMessage(chat_id = chat_id, text = DESC, parse_mode = 'MarkdownV2')
 
 @calls
@@ -106,20 +103,11 @@ def close(update, context):
 
     if req is None:
         print('[close] req is None, exiting')
+        context.bot.sendMessage(chat_id = update.message.chat_id, text = 'Si è verificato un errore nella tua richiesta, riprova.')
         return ConversationHandler.END
-        
-    print('[close] pushed request on queue')
 
-    if req.date is None:
-        text = '\n\nNome: {}\nDescrizione: {}\n\nGrazie per aver utilizzato Bot the Builder!'.format(req.name, req.desc)
-        req.date = datetime.datetime(2099, 12, 31)
-    else:
-        text = '\n\nNome: {}\nDescrizione: {}\nLa deadline per la consegna è per il {}.\n\nGrazie per aver utilizzato Bot the Builder!'.format(req.name, req.desc, str(req.date.date()))   
-
-    context.bot_data['queue'].push(req)
-
-    context.bot.sendMessage(chat_id = update.message.chat.id, text = strings.RIEPILOGO_UTENTE + text, reply_markup = ReplyKeyboardRemove())
-    context.bot.sendMessage(chat_id = ADMIN, text = strings.RIEPILOGO_ADMIN + text)
+    context.bot.sendMessage(chat_id = update.message.chat.id, text = strings.RIEPILOGO_UTENTE + '\n\n' + str(req) + strings.RIEPILOGO_RINGRAZIAMENTO, reply_markup = ReplyKeyboardRemove())
+    context.bot.sendMessage(chat_id = ADMIN, text = strings.RIEPILOGO_ADMIN + '\n\n' + str(req))
 
     return ConversationHandler.END
 

@@ -18,6 +18,12 @@ class BotRequest:
         self.desc = desc
         self.date = date
 
+    def __str__(self):
+        if self.date is None:
+            return 'Nome: {}\nDescrizione: {}\n\n'.format(self.name, self.desc)
+        else:
+            return 'Nome: {}\nDescrizione: {}\nLa deadline per la consegna è per il {}.\n\n'.format(self.name, self.desc, str(self.date.date()))
+
 class RequestQueue:
 
     def __init__(self):
