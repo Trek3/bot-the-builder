@@ -8,5 +8,3 @@ Per annullare la creazione di un nuovo bot, puoi mandare **/cancel** in qualsias
 
 Il bot viene creato e hostato da me\.
 Se sarai soddisfatto del servizio, considera di **parlarne con i tuoi amici**\.
-
-Creata con l'utilizzo di [python-telegram-bot](https://github.com/python-telegram-bot/python-telegram-bot). Utilizza le funzionalità di [calendar-telegram](https://github.com/unmonoqueteclea/calendar-telegram).
