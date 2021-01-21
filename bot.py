@@ -7,10 +7,12 @@ from telegram.ext import Updater, CommandHandler, ConversationHandler, MessageHa
 from telegram import ReplyKeyboardMarkup, ReplyKeyboardRemove, ForceReply
 
 from utils import calls, BotRequest, RequestQueue
+from operatedatabase import DATABASE_OPERATIONS
 
 TOKEN = open('TOKEN').read().strip()
 ADMIN = open('ADMIN').read().strip()
 DESC = open('HELP.md').read()
+DATABASE = open('DATABASE').read().strip()
 
 NAMING, DESCRIPTION, DATE, CANCEL, SELECT, CLOSE = range(6)
 
@@ -105,6 +107,10 @@ def close(update, context):
         print('[close] req is None, exiting')
         context.bot.sendMessage(chat_id = update.message.chat_id, text = 'Si è verificato un errore nella tua richiesta, riprova.')
         return ConversationHandler.END
+
+    req.create()
+
+    print('[close] created bot with username: {}'.format(req.username))
 
     context.bot.sendMessage(chat_id = update.message.chat.id, text = strings.RIEPILOGO_UTENTE + '\n\n' + str(req) + strings.RIEPILOGO_RINGRAZIAMENTO, reply_markup = ReplyKeyboardRemove())
     context.bot.sendMessage(chat_id = ADMIN, text = strings.RIEPILOGO_ADMIN + '\n\n' + str(req))

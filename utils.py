@@ -13,10 +13,13 @@ def ID():
 class BotRequest:
 
     def __init__(self, name = None, desc = None, date = None):
-        self.id = ID()
         self.name = name
         self.desc = desc
         self.date = date
+
+    def create(self):
+        if self.name is not None:
+            self.username = 'botthebuilder_' + ''.join(self.name.split()) + '_bot'
 
     def __str__(self):
         if self.date is None:
