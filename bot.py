@@ -7,12 +7,15 @@ from telegram.ext import Updater, CommandHandler, ConversationHandler, MessageHa
 from telegram import ReplyKeyboardMarkup, ReplyKeyboardRemove, ForceReply
 
 from utils import calls, BotRequest, RequestQueue
+from database import Database
 from operatedatabase import DATABASE_OPERATIONS
 
 TOKEN = open('TOKEN').read().strip()
 ADMIN = open('ADMIN').read().strip()
 DESC = open('HELP.md').read()
 DATABASE = open('DATABASE').read().strip()
+
+db = Database()
 
 NAMING, DESCRIPTION, DATE, CANCEL, SELECT, CLOSE = range(6)
 
@@ -90,16 +93,18 @@ def date_selection(update, context):
 
         req = context.user_data['last_req']
 
-        req.date = _date
+        req.date = _date.date()
 
         context.user_data['last_req'] = req
 
-        context.bot.sendMessage(chat_id = update.callback_query.message.chat.id, text = 'Hai selezionato {}.\nInvia Ok per confermare.'.format(_date.date()))
+        context.bot.sendMessage(chat_id = update.callback_query.message.chat.id, text = 'Hai selezionato {}.\nInvia Ok per confermare.'.format(_date))
 
         return CLOSE
 
 @calls
 def close(update, context):
+
+    global db
 
     req = context.user_data['last_req']
 
@@ -111,6 +116,15 @@ def close(update, context):
     req.create()
 
     print('[close] created bot with username: {}'.format(req.username))
+
+    if not db.connect(DATABASE):
+        print('[database] could not connect to database')
+
+    if not db.insert(req):
+        print('[database] error executing insert query')
+
+    if not db.disconnect():
+        print('[database] there are uncommitted changes')
 
     context.bot.sendMessage(chat_id = update.message.chat.id, text = strings.RIEPILOGO_UTENTE + '\n\n' + str(req) + strings.RIEPILOGO_RINGRAZIAMENTO, reply_markup = ReplyKeyboardRemove())
     context.bot.sendMessage(chat_id = ADMIN, text = strings.RIEPILOGO_ADMIN + '\n\n' + str(req))
