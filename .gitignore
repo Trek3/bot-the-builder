@@ -1,4 +1,9 @@
 TOKEN
 ADMIN
+DATABASE
 calendartelegram
 __pycache__
+createdatabase.py
+operatedatabase.py
+database.py
+requests.db
