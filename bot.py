@@ -137,16 +137,17 @@ def main():
     newbot_handler = ConversationHandler(
         entry_points = [CommandHandler('newbot', newbot)],
         states = {
-            NAMING : [MessageHandler(Filters.text, name)],
-            DESCRIPTION : [MessageHandler(Filters.text, description)],
+            NAMING : [MessageHandler(Filters.text & ~Filters.command, name)],
+            DESCRIPTION : [MessageHandler(Filters.text & ~Filters.command, description)],
             DATE : [MessageHandler(Filters.regex('^(Si)$'), select), CommandHandler('skip', close)],
             SELECT : [CallbackQueryHandler(date_selection)],
-            CLOSE : [MessageHandler(Filters.all, close)]
+            CLOSE : [MessageHandler(Filters.text & ~Filters.command, close)]
         },
-        fallbacks = [MessageHandler(Filters.all, cancel)]
+        fallbacks = [CommandHandler('cancel', cancel)]
     )
 
     updater.dispatcher.add_handler(CommandHandler('start', start))
+    updater.dispatcher.add_handler(CommandHandler('help', start))
     updater.dispatcher.add_handler(newbot_handler)
 
     updater.start_polling()
