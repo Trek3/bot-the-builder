@@ -1,3 +1,7 @@
+from dateutil.relativedelta import relativedelta
+
+import datetime
+
 def calls(f):
     def wrapper(*args):
         print('### calling function {}'.format(f.__name__))
@@ -13,16 +17,22 @@ def ID():
 class BotRequest:
 
     def __init__(self, name = None, desc = None, date = None):
-        self.id = ID()
         self.name = name
         self.desc = desc
         self.date = date
+
+    def create(self):
+        if self.name is not None:
+            self.username = 'botthebuilder_' + ''.join(self.name.split()) + '_bot'
+        
+        if self.date is None:
+            self.date = datetime.datetime.now().date() + relativedelta(months = 1)
 
     def __str__(self):
         if self.date is None:
             return 'Nome: {}\nDescrizione: {}\n\n'.format(self.name, self.desc)
         else:
-            return 'Nome: {}\nDescrizione: {}\nLa deadline per la consegna è per il {}.\n\n'.format(self.name, self.desc, str(self.date.date()))
+            return 'Nome: {}\nDescrizione: {}\nLa deadline per la consegna è per il {}.\n\n'.format(self.name, self.desc, str(self.date))
 
 class RequestQueue:
 
