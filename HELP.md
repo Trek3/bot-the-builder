@@ -4,6 +4,7 @@ Questa è la lista di comandi che puoi utilizzare per parlare con me\.
 **/start** \- visualizza questo messaggio\.
 **/newbot** \- inizia la richiesta per un nuovo bot\. Dovrai descrivere le funzionalità e se è necessario, potrai richiedere una deadline da rispettare\.
 **/help** \- visualizza questo messaggio\.
+**/report** \- invia una segnalazione su uno dei tuoi bot\.
 
 Per annullare la creazione di un nuovo bot, puoi mandare **/cancel** in qualsiasi momento della conversazione\.
 

@@ -16,11 +16,12 @@ def ID():
 
 class BotRequest:
 
-    def __init__(self, name = None, desc = None, date = None):
+    def __init__(self, name = None, desc = None, date = None, chat_id = None):
         self.name = name
         self.desc = desc
         self.date = date
-
+        self.chat_id = chat_id
+        
     def create(self):
         if self.name is not None:
             self.username = 'botthebuilder_' + ''.join(self.name.split()) + '_bot'

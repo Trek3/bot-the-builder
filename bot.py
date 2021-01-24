@@ -19,6 +19,8 @@ db = Database()
 
 NAMING, DESCRIPTION, DATE, CANCEL, SELECT, CLOSE = range(6)
 
+REPORT_SELECTION, REPORT_DESCRIPTION = range(2)
+
 def start(update, context):
     chat_id = update.message.chat.id
 
@@ -32,6 +34,8 @@ def cancel(update, context):
     context.bot.sendMessage(chat_id = chat_id, text = "Annullo l'operazione.")
 
     return ConversationHandler.END
+
+#------------------------------------------- NEWBOT --------------------------------------------#
 
 @calls
 def newbot(update, context):
@@ -53,7 +57,7 @@ def name(update, context):
 
     context.bot.sendMessage(chat_id = chat_id, text = text)
 
-    req = BotRequest(bot_name)
+    req = BotRequest(name = bot_name, chat_id = chat_id)
 
     context.user_data['last_req'] = req
 
@@ -131,6 +135,70 @@ def close(update, context):
 
     return ConversationHandler.END
 
+#------------------------------------------- REPORT --------------------------------------------#
+
+def prepare_markup(ls):
+
+    ls = list(sum(ls, ()))
+
+    n = len(ls)
+    k = 4
+
+    return ReplyKeyboardMarkup([ls[i * (n // k) + min(i, n % k):(i+1) * (n // k) + min(i+1, n % k)] for i in range(k)])
+
+@calls
+def report(update, context):
+
+    global db
+
+    chat_id = update.message.chat.id
+
+    if not db.connect(DATABASE):
+        print('[report] error connnecting to the database')
+        return ConversationHandler.END
+
+    ret, entries = db.report(chat_id)
+
+    if not db.disconnect():
+        print('[report] error disconnecting')
+
+    if not ret:
+        context.bot.sendMessage(chat_id = chat_id, text = 'Sembra che tu non abbia creato ancora bot. Puoi utilizzare /newbot per crearne uno.')
+        ConversationHandler.END
+
+    markup = prepare_markup(entries)
+    
+    context.bot.sendMessage(chat_id = chat_id, text = 'Hai riscontrato un problema o vuoi cambiare qualcosa. Seleziona il bot di cui vuoi fare la segnalazione.', reply_markup = markup)
+
+    return REPORT_SELECTION
+
+@calls
+def report_selection(update, context):
+
+    chat_id = update.message.chat.id
+    msg = update.message.text
+
+    context.user_data['bot_name'] = msg
+
+    context.bot.sendMessage(chat_id = chat_id, text = 'Vuoi riportare qualcosa per {}. Scrivi la tua segnalazione.'.format(msg), reply_markup = ReplyKeyboardRemove())
+
+    return REPORT_DESCRIPTION
+
+@calls
+def report_description(update, context):
+
+    chat_id = update.message.chat.id
+    msg = update.message.text
+
+    bot_name = context.user_data['bot_name']
+
+    context.bot.sendMessage(chat_id = chat_id, text = 'Grazie per la segnalazione, spero di poterti aiutare al più presto.')
+    context.bot.sendMessage(chat_id = ADMIN, text = 'Hai ricevuto la seguente segnalazione per {}:\n\n{}'.format(bot_name, msg))
+
+    return ConversationHandler.END
+
+#-------------------------------------------- MAIN ---------------------------------------------#
+
 def main():
     updater = Updater(TOKEN, use_context=True)
 
@@ -146,9 +214,20 @@ def main():
         fallbacks = [CommandHandler('cancel', cancel)]
     )
 
+    report_handler = ConversationHandler(
+        entry_points = [CommandHandler('report', report)],
+        states = {
+            REPORT_SELECTION : [MessageHandler(Filters.text & ~Filters.command, report_selection)],
+            REPORT_DESCRIPTION : [MessageHandler(Filters.text & ~Filters.command, report_description)]
+        },
+        fallbacks = [CommandHandler('cancel', cancel)]
+
+    )
+
     updater.dispatcher.add_handler(CommandHandler('start', start))
     updater.dispatcher.add_handler(CommandHandler('help', start))
     updater.dispatcher.add_handler(newbot_handler)
+    updater.dispatcher.add_handler(report_handler)
 
     updater.start_polling()
     updater.idle()
