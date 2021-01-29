@@ -6,7 +6,7 @@ from calendartelegram import telegramcalendar
 from telegram.ext import Updater, CommandHandler, ConversationHandler, MessageHandler, Filters, CallbackQueryHandler
 from telegram import ReplyKeyboardMarkup, ReplyKeyboardRemove, ForceReply
 
-from utils import calls, BotRequest, RequestQueue
+from utils import calls, BotRequest
 from database import Database
 from operatedatabase import DATABASE_OPERATIONS
 
@@ -119,19 +119,18 @@ def close(update, context):
 
     req.create()
 
-    print('[close] created bot with username: {}'.format(req.username))
-
     if not db.connect(DATABASE):
         print('[database] could not connect to database')
 
-    if not db.insert(req):
+    ret, bot_id = db.insert(req)
+    if not ret:
         print('[database] error executing insert query')
 
     if not db.disconnect():
         print('[database] there are uncommitted changes')
 
     context.bot.sendMessage(chat_id = update.message.chat.id, text = strings.RIEPILOGO_UTENTE + '\n\n' + str(req) + strings.RIEPILOGO_RINGRAZIAMENTO, reply_markup = ReplyKeyboardRemove())
-    context.bot.sendMessage(chat_id = ADMIN, text = strings.RIEPILOGO_ADMIN + '\n\n' + str(req))
+    context.bot.sendMessage(chat_id = ADMIN, text = strings.RIEPILOGO_ADMIN + '\n\n' + str(req) + '\n\nREQUEST ID: ' + str(bot_id))
 
     return ConversationHandler.END
 
@@ -157,7 +156,7 @@ def report(update, context):
         print('[report] error connnecting to the database')
         return ConversationHandler.END
 
-    ret, entries = db.report(chat_id)
+    ret, entries = db.select(query = DATABASE_OPERATIONS['report'], params = (chat_id,))
 
     if not db.disconnect():
         print('[report] error disconnecting')
@@ -197,6 +196,36 @@ def report_description(update, context):
 
     return ConversationHandler.END
 
+#------------------------------------------- DELIVER -------------------------------------------#
+
+@calls
+def deliver(update, context):
+
+    bot_id, bot_username = update.message.text.split()[1:]
+
+    if not db.connect(DATABASE):
+        print('[deliver] error connecting database')
+
+    params = (bot_username, bot_id, )
+
+    ret = db.deliver(params)
+    if not ret:
+        print('[deliver] error inserting in database')
+
+    ret, entries = db.select(query = DATABASE_OPERATIONS['deliver'], params = (bot_id,))
+    if not ret:
+        print('[deliver] error executing on database')
+
+    if not db.disconnect():
+        print('[deliver] error disconnecting database')
+
+    if len(entries) != 1:
+        print('[deliver] multiple bots with same id in database')
+
+    bot_name, bot_username, chat_id = entries[0]
+
+    context.bot.sendMessage(chat_id = chat_id, text = 'Il tuo {} è completo! Puoi iniziare a usarlo scrivendo a {}.\n\nSpero ti piaccia e ricorda, se hai problemi, puoi segnalarli inviando il comando /report.\n\nGrazie per aver usato Bot the Builder.'.format(bot_name, bot_username))
+
 #-------------------------------------------- MAIN ---------------------------------------------#
 
 def main():
@@ -228,6 +257,7 @@ def main():
     updater.dispatcher.add_handler(CommandHandler('help', start))
     updater.dispatcher.add_handler(newbot_handler)
     updater.dispatcher.add_handler(report_handler)
+    updater.dispatcher.add_handler(CommandHandler('deliver', deliver))
 
     updater.start_polling()
     updater.idle()
