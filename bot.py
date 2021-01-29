@@ -6,7 +6,7 @@ from calendartelegram import telegramcalendar
 from telegram.ext import Updater, CommandHandler, ConversationHandler, MessageHandler, Filters, CallbackQueryHandler
 from telegram import ReplyKeyboardMarkup, ReplyKeyboardRemove, ForceReply
 
-from utils import calls, BotRequest, RequestQueue
+from utils import calls, BotRequest
 from database import Database
 from operatedatabase import DATABASE_OPERATIONS
 
@@ -18,6 +18,8 @@ DATABASE = open('DATABASE').read().strip()
 db = Database()
 
 NAMING, DESCRIPTION, DATE, CANCEL, SELECT, CLOSE = range(6)
+
+REPORT_SELECTION, REPORT_DESCRIPTION = range(2)
 
 def start(update, context):
     chat_id = update.message.chat.id
@@ -32,6 +34,8 @@ def cancel(update, context):
     context.bot.sendMessage(chat_id = chat_id, text = "Annullo l'operazione.")
 
     return ConversationHandler.END
+
+#------------------------------------------- NEWBOT --------------------------------------------#
 
 @calls
 def newbot(update, context):
@@ -53,7 +57,7 @@ def name(update, context):
 
     context.bot.sendMessage(chat_id = chat_id, text = text)
 
-    req = BotRequest(bot_name)
+    req = BotRequest(name = bot_name, chat_id = chat_id)
 
     context.user_data['last_req'] = req
 
@@ -115,21 +119,114 @@ def close(update, context):
 
     req.create()
 
-    print('[close] created bot with username: {}'.format(req.username))
-
     if not db.connect(DATABASE):
         print('[database] could not connect to database')
 
-    if not db.insert(req):
+    ret, bot_id = db.insert(req)
+    if not ret:
         print('[database] error executing insert query')
 
     if not db.disconnect():
         print('[database] there are uncommitted changes')
 
     context.bot.sendMessage(chat_id = update.message.chat.id, text = strings.RIEPILOGO_UTENTE + '\n\n' + str(req) + strings.RIEPILOGO_RINGRAZIAMENTO, reply_markup = ReplyKeyboardRemove())
-    context.bot.sendMessage(chat_id = ADMIN, text = strings.RIEPILOGO_ADMIN + '\n\n' + str(req))
+    context.bot.sendMessage(chat_id = ADMIN, text = strings.RIEPILOGO_ADMIN + '\n\n' + str(req) + '\n\nREQUEST ID: ' + str(bot_id))
 
     return ConversationHandler.END
+
+#------------------------------------------- REPORT --------------------------------------------#
+
+def prepare_markup(ls):
+
+    ls = list(sum(ls, ()))
+
+    n = len(ls)
+    k = 4
+
+    return ReplyKeyboardMarkup([ls[i * (n // k) + min(i, n % k):(i+1) * (n // k) + min(i+1, n % k)] for i in range(k)])
+
+@calls
+def report(update, context):
+
+    global db
+
+    chat_id = update.message.chat.id
+
+    if not db.connect(DATABASE):
+        print('[report] error connnecting to the database')
+        return ConversationHandler.END
+
+    ret, entries = db.select(query = DATABASE_OPERATIONS['report'], params = (chat_id,))
+
+    if not db.disconnect():
+        print('[report] error disconnecting')
+
+    if not ret:
+        context.bot.sendMessage(chat_id = chat_id, text = 'Sembra che tu non abbia creato ancora bot. Puoi utilizzare /newbot per crearne uno.')
+        ConversationHandler.END
+
+    markup = prepare_markup(entries)
+    
+    context.bot.sendMessage(chat_id = chat_id, text = 'Hai riscontrato un problema o vuoi cambiare qualcosa. Seleziona il bot di cui vuoi fare la segnalazione.', reply_markup = markup)
+
+    return REPORT_SELECTION
+
+@calls
+def report_selection(update, context):
+
+    chat_id = update.message.chat.id
+    msg = update.message.text
+
+    context.user_data['bot_name'] = msg
+
+    context.bot.sendMessage(chat_id = chat_id, text = 'Vuoi riportare qualcosa per {}. Scrivi la tua segnalazione.'.format(msg), reply_markup = ReplyKeyboardRemove())
+
+    return REPORT_DESCRIPTION
+
+@calls
+def report_description(update, context):
+
+    chat_id = update.message.chat.id
+    msg = update.message.text
+
+    bot_name = context.user_data['bot_name']
+
+    context.bot.sendMessage(chat_id = chat_id, text = 'Grazie per la segnalazione, spero di poterti aiutare al più presto.')
+    context.bot.sendMessage(chat_id = ADMIN, text = 'Hai ricevuto la seguente segnalazione per {}:\n\n{}'.format(bot_name, msg))
+
+    return ConversationHandler.END
+
+#------------------------------------------- DELIVER -------------------------------------------#
+
+@calls
+def deliver(update, context):
+
+    bot_id, bot_username = update.message.text.split()[1:]
+
+    if not db.connect(DATABASE):
+        print('[deliver] error connecting database')
+
+    params = (bot_username, bot_id, )
+
+    ret = db.deliver(params)
+    if not ret:
+        print('[deliver] error inserting in database')
+
+    ret, entries = db.select(query = DATABASE_OPERATIONS['deliver'], params = (bot_id,))
+    if not ret:
+        print('[deliver] error executing on database')
+
+    if not db.disconnect():
+        print('[deliver] error disconnecting database')
+
+    if len(entries) != 1:
+        print('[deliver] multiple bots with same id in database')
+
+    bot_name, bot_username, chat_id = entries[0]
+
+    context.bot.sendMessage(chat_id = chat_id, text = 'Il tuo {} è completo! Puoi iniziare a usarlo scrivendo a {}.\n\nSpero ti piaccia e ricorda, se hai problemi, puoi segnalarli inviando il comando /report.\n\nGrazie per aver usato Bot the Builder.'.format(bot_name, bot_username))
+
+#-------------------------------------------- MAIN ---------------------------------------------#
 
 def main():
     updater = Updater(TOKEN, use_context=True)
@@ -146,9 +243,21 @@ def main():
         fallbacks = [CommandHandler('cancel', cancel)]
     )
 
+    report_handler = ConversationHandler(
+        entry_points = [CommandHandler('report', report)],
+        states = {
+            REPORT_SELECTION : [MessageHandler(Filters.text & ~Filters.command, report_selection)],
+            REPORT_DESCRIPTION : [MessageHandler(Filters.text & ~Filters.command, report_description)]
+        },
+        fallbacks = [CommandHandler('cancel', cancel)]
+
+    )
+
     updater.dispatcher.add_handler(CommandHandler('start', start))
     updater.dispatcher.add_handler(CommandHandler('help', start))
     updater.dispatcher.add_handler(newbot_handler)
+    updater.dispatcher.add_handler(report_handler)
+    updater.dispatcher.add_handler(CommandHandler('deliver', deliver))
 
     updater.start_polling()
     updater.idle()
